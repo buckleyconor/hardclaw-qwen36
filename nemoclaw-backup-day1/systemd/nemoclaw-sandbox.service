@@ -1,0 +1,23 @@
+[Unit]
+Description=NemoClaw AI Agent Sandbox — hardclaw-omni (the-king)
+Documentation=file:///home/democenter/projects/hardclaw-omni/README.txt
+After=network-online.target docker.service
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=democenter
+Environment="HOME=/home/democenter"
+Environment="PATH=/home/democenter/.npm-global/bin:/home/democenter/.local/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=-/home/democenter/.nemoclaw.env
+ExecStart=/usr/local/bin/nemoclaw-sandbox-start
+ExecStop=/usr/local/bin/nemoclaw-sandbox-stop
+TimeoutStartSec=300
+TimeoutStopSec=60
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

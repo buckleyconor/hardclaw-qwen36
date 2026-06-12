@@ -1,0 +1,9 @@
+captured_utc: 2026-06-04T18:32:54Z
+host: promaxgb10
+sandbox: the-king
+model: qwen3.6-35b-a3b-dflash (external vLLM :8000)
+searxng_port: 8888
+container_at_capture: openshell-the-king-cc564c62-efd4-45de-8a1b-514e3648a576
+policy_version_at_capture: 9
+nemoclaw_tag: v0.0.56
+skills_captured: workspace/skills/meal-planner/SKILL.md,plugin-skills/ai-news/SKILL.md,plugin-skills/meal-planner/SKILL.md

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# hardclaw-omni shutdown wrapper — managed by install.sh, do not edit manually
+set -euo pipefail
+
+export PATH="/home/democenter/.npm-global/bin:/home/democenter/.local/bin:/usr/local/bin:/usr/bin:/bin"
+SANDBOX="the-king"
+LOG=/var/log/nemoclaw-sandbox-stop.log
+
+log() { local m="$(date '+%Y-%m-%d %T') $*"; echo "$m"; echo "$m" >> "$LOG" 2>/dev/null || true; }
+log "=== nemoclaw-sandbox-stop (${SANDBOX}) ==="
+
+# Stop ONLY the sandbox container. vLLM (qwen3.6-35b) and SearXNG are owned by
+# their own projects (Docker unless-stopped) — leave them running.
+CONTAINER=$(docker ps --filter "name=openshell-${SANDBOX}-" --format '{{.Names}}' | head -1 || true)
+if [[ -n "$CONTAINER" ]]; then
+    log "Stopping sandbox container '${CONTAINER}'..."
+    docker stop --time 30 "$CONTAINER" 2>&1 | tee -a "$LOG" || true
+else
+    log "No running sandbox container to stop."
+fi
+
+log "=== shutdown complete ==="

@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# hardclaw-omni startup wrapper — managed by install.sh, do not edit manually
+#
+# Reboot-survival model: the vLLM inference server (qwen3.6-35b-a3b-dflash,
+# owned by the separate dgx-spark-vllm-qwen project), SearXNG, and the sandbox
+# container are all Docker `unless-stopped`, so Docker itself brings them back.
+# This unit's real job is to (1) ensure the OpenShell gateway daemon is running
+# — it has no boot unit of its own and is what the sandbox fetches its L7 policy
+# from via gRPC — and (2) make sure the sandbox container is cleanly serving once
+# the gateway is up. It NEVER re-onboards: a genuinely missing sandbox is logged
+# and left for manual recovery (auto-onboard previously clobbered the sandbox).
+set -euo pipefail
+
+export PATH="/home/democenter/.npm-global/bin:/home/democenter/.local/bin:/usr/local/bin:/usr/bin:/bin"
+NEMOCLAW="/home/democenter/.local/bin/nemoclaw"
+SANDBOX="the-king"
+SEARXNG_PORT="8888"
+VLLM_PORT="8000"          # qwen3.6-35b-a3b-dflash, served by the external vLLM project
+LOG=/var/log/nemoclaw-sandbox-start.log
+
+# Always log to stdout (captured by the journal); append to $LOG best-effort so a
+# non-writable/absent log file can never abort startup under `set -e`.
+log() { local m="$(date '+%Y-%m-%d %T') $*"; echo "$m"; echo "$m" >> "$LOG" 2>/dev/null || true; }
+log "=== nemoclaw-sandbox-start (hardclaw-omni / ${SANDBOX}) ==="
+
+# Credentials (Telegram bot token etc.) — the gateway resolves these for the bridge.
+[[ -f "/home/democenter/.nemoclaw.env" ]] && set -a && source "/home/democenter/.nemoclaw.env" && set +a
+
+# 1. Wait for Docker
+log "Waiting for Docker..."
+for i in $(seq 1 30); do docker info &>/dev/null && break; sleep 2; done
+docker info &>/dev/null || { log "ERROR: Docker not ready"; exit 1; }
+log "Docker ready"
+
+# 2. Best-effort wait for the external vLLM inference server on :${VLLM_PORT}.
+#    The sandbox can boot before inference is ready (only model calls need it),
+#    so don't block startup on a slow model load.
+log "Waiting (best-effort) for vLLM on :${VLLM_PORT}..."
+for i in $(seq 1 12); do
+    curl -sf --max-time 5 "http://localhost:${VLLM_PORT}/v1/models" &>/dev/null && break
+    sleep 5
+done
+curl -sf --max-time 5 "http://localhost:${VLLM_PORT}/v1/models" &>/dev/null \
+    && log "vLLM ready on :${VLLM_PORT}" \
+    || log "WARNING: vLLM not ready yet on :${VLLM_PORT} — inference will fail until it loads"
+
+# 3. SearXNG availability (external, unless-stopped) — informational only.
+curl -sf --max-time 5 "http://localhost:${SEARXNG_PORT}/search?q=test&format=json" &>/dev/null \
+    && log "SearXNG responding on :${SEARXNG_PORT}" \
+    || log "WARNING: SearXNG not responding on :${SEARXNG_PORT} — web search may fail"
+
+# 4. Ensure the OpenShell gateway daemon is up. It is auto-spawned on first CLI
+#    use and has no boot unit; the sandbox fetches policy from it, so it MUST be
+#    running before the container boots. `status` connects to (and spawns) it.
+log "Ensuring OpenShell gateway is up..."
+gw_ok=0
+for i in $(seq 1 15); do
+    if "$NEMOCLAW" "$SANDBOX" status &>/dev/null; then gw_ok=1; break; fi
+    sleep 2
+done
+[[ "$gw_ok" == 1 ]] && log "Gateway up; sandbox '${SANDBOX}' known" \
+    || log "WARNING: gateway/sandbox status not confirmed after 30s"
+
+# 5. Ensure the sandbox container is cleanly serving. It is unless-stopped, but at
+#    boot it may have crash-looped on policy fetch before the gateway came up
+#    (step 4). Find it by name; restart once if it isn't already serving so it
+#    gets a clean policy fetch. NEVER onboard — refuse to auto-recreate.
+CONTAINER=$(docker ps -a --filter "name=openshell-${SANDBOX}-" --format '{{.Names}}' | head -1 || true)
+if [[ -z "$CONTAINER" ]]; then
+    log "ERROR: no sandbox container 'openshell-${SANDBOX}-*' found — NOT onboarding."
+    log "       Recover manually (e.g. re-run install.sh); refusing to auto-recreate."
+    exit 0
+fi
+if [[ "$(docker inspect -f '{{.State.Status}}' "$CONTAINER" 2>/dev/null)" == "running" ]] \
+   && docker exec "$CONTAINER" sh -c "grep -q 'http server listening' /tmp/gateway.log" &>/dev/null; then
+    log "Sandbox container '${CONTAINER}' already serving"
+else
+    log "Restarting sandbox container '${CONTAINER}' for a clean policy fetch..."
+    docker restart "$CONTAINER" &>/dev/null || log "WARNING: docker restart failed"
+fi
+
+log "=== startup complete ==="

@@ -1,0 +1,30 @@
+# hardclaw-omni — keep secrets, run artifacts, and personal data out of git
+
+# Credential files
+.nemoclaw.env
+**/secrets/
+!**/secrets/.gitignore
+
+# Backup archives (may bundle credentials)
+*.tar.gz
+
+# Run logs (may contain IDs / tokens)
+hardclaw-install.log
+*.log
+
+# NGC CLI vendored download
+ngccli_arm64.zip
+ngc-cli/
+ngc-cli.md5
+
+# Local Claude Code settings (approved-command list, local paths)
+.claude/
+
+# Personal agent state — the live sandbox snapshot is operator-specific
+# (memory DB, identity, household meal data). Only the reusable scaffolding
+# of the backup template is published; the captured config is not.
+nemoclaw-backup-day1/sandbox-config/
+
+# Personal meal-planner reference data (household/location specific)
+/recipes.md
+/aisle-order.md
