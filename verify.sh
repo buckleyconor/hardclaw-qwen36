@@ -387,7 +387,7 @@ if [[ -f "$bridge_script" ]]; then
         pass "Telegram bridge: session-lock fix applied (--to)"
     else
         warn "Telegram bridge: session-lock fix may not be applied — Telegram responses may fail"
-        warn "  Fix: see README.txt §Phase 7"
+        warn "  Fix: see README.md §Phase 7"
     fi
 else
     warn "Telegram bridge script not found: $bridge_script"

@@ -1,6 +1,6 @@
 [Unit]
 Description=NemoClaw AI Agent Sandbox — hardclaw-omni (the-king)
-Documentation=file:///home/democenter/projects/hardclaw-omni/README.txt
+Documentation=file:///home/democenter/projects/hardclaw-omni/README.md
 After=network-online.target docker.service
 Requires=docker.service
 Wants=network-online.target

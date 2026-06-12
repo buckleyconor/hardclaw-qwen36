@@ -861,7 +861,7 @@ with open('${config_file}', 'w') as f:
     json.dump(c, f, indent=2)
 " 2>/dev/null && \
         ok "Agent config: skipBootstrap=false, reasoning=true, SearXNG web_search enabled, toolSearch=false" || \
-        warn "Agent config patch failed — apply manually (see README.txt)"
+        warn "Agent config patch failed — apply manually (see README.md)"
 
     docker exec "$container" \
         sh -c "cd /sandbox/.openclaw && sha256sum openclaw.json > .config-hash" 2>/dev/null && \
@@ -985,7 +985,7 @@ phase_telegram() {
           \"allowFrom\": [\"${TELEGRAM_USER_ID}\"]\$2|" \
         "$config_file" 2>/dev/null && \
         ok "openclaw.json: Telegram dmPolicy=allowlist, allowFrom=[${TELEGRAM_USER_ID}]" || \
-        warn "Telegram whitelist inject failed — apply manually per README.txt §Phase 7"
+        warn "Telegram whitelist inject failed — apply manually per README.md §Phase 7"
 
     # 7b: Set OpenShell inference proxy timeout (default 60s is too short for long prompts)
     if command -v openshell &>/dev/null; then
@@ -1151,7 +1151,7 @@ WRAPPER
     sudo tee /etc/systemd/system/nemoclaw-sandbox.service > /dev/null <<SERVICE
 [Unit]
 Description=NemoClaw AI Agent Sandbox — hardclaw-omni (${SANDBOX_NAME})
-Documentation=file://${SCRIPT_DIR}/README.txt
+Documentation=file://${SCRIPT_DIR}/README.md
 After=network-online.target docker.service
 Requires=docker.service
 Wants=network-online.target

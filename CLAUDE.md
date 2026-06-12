@@ -54,7 +54,7 @@ clobbered the sandbox with the wrong model).
 | `install.sh` | Automated deployment (phases 0–10, idempotent) |
 | `verify.sh` | 7-layer security + health checks (run any time) |
 | `shutdown.sh` | Clean teardown |
-| `README.txt` | Quick start + troubleshooting |
+| `README.md` | Quick start + troubleshooting |
 
 Runtime files created during deployment (not in repo):
 - `~/.nemoclaw.env` — credentials (chmod 600; user creates before running install)
