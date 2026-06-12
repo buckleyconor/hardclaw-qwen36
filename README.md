@@ -1,4 +1,4 @@
-hardclaw-omni
+hardclaw-qwen3.6
 =============
 Security-hardened NemoClaw v0.0.56 + external vLLM serving Qwen 3.6 35B A3B
 on Dell Pro Max GB10 (DGX Spark, 128 GB UMA)
