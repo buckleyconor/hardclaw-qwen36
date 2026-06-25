@@ -55,6 +55,8 @@ clobbered the sandbox with the wrong model).
 | `verify.sh` | 7-layer security + health checks (run any time) |
 | `shutdown.sh` | Clean teardown |
 | `README.md` | Quick start + troubleshooting |
+| `policies/news-sources.yaml` | Egress preset: news domains the agent may `web_fetch` (AI News cron + interactive) |
+| `policies/weather-services.yaml` | Egress preset: wttr.in + met.ie for the daily-weather cron |
 
 Runtime files created during deployment (not in repo):
 - `~/.nemoclaw.env` — credentials (chmod 600; user creates before running install)
@@ -77,6 +79,33 @@ This deployment explicitly mitigates 10 Q1 2026 OpenClaw incidents:
 - api.telegram.org and SearXNG :8888 are the only outbound network_policy entries
 - Telegram bridge has `allowed_user_ids` set to the operator's Telegram user ID
 - Dashboard port 18789 is UFW-denied; only accessible via SSH tunnel
+
+## Egress Policy Presets (`policies/`)
+
+The sandbox network policy is deny-all by default, so `web_search` (via SearXNG)
+returns snippets but the agent cannot `web_fetch` (open) the actual article/forecast
+pages — those come back as `fetch failed`. Without a domain whitelist, the AI News and
+weather briefings are built from search snippets only, not full article content. The
+presets here re-open a small, trusted set of hosts to preserve the deny-all posture:
+
+| Preset | Hosts opened | Consumed by |
+|--------|--------------|-------------|
+| `policies/news-sources.yaml` | rte.ie, irishtimes.com, thejournal.ie, bbc.com/.co.uk, techcrunch.com, theregister.com, therundown.ai, tldr.tech, codenewsletter.ai, superhuman.ai (apex + www, GET only) | AI News cron + interactive "latest news" |
+| `policies/weather-services.yaml` | wttr.in (:80 + :443), met.ie / www.met.ie | daily-weather cron |
+
+Apply (idempotent, **hot-reloads** — no sandbox restart needed; survives container
+restart but a full NemoClaw reinstall drops them, so re-apply after reinstall):
+
+```bash
+nemoclaw the-king policy-add --from-file policies/news-sources.yaml --dry-run   # review first
+nemoclaw the-king policy-add --from-file policies/news-sources.yaml --yes
+nemoclaw the-king policy-add --from-file policies/weather-services.yaml --yes
+nemoclaw the-king policy-list                       # confirm both show ● applied
+```
+
+Each endpoint uses `protocol: rest` + `enforcement: enforce` with a `GET /**` allow
+rule. Keep the list minimal — every host added widens sandbox egress. A malformed
+`protocol:` will crash-loop the container on the next restart (see Known Issues).
 
 ## Deployment Phases
 

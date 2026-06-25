@@ -1,0 +1,43 @@
+preset:
+  name: weather-services
+  description: >-
+    Weather data sources for the daily-weather skill.
+    wttr.in is the skill's primary source (curl, plain http) with met.ie as the
+    web_fetch fallback. Without these the deny-all policy blocks all forecast
+    data and the report fails.
+
+network_policies:
+  weather_services:
+    name: weather_services
+    endpoints:
+      # wttr.in — skill calls `curl -s "wttr.in/Cork?format=j1"` (defaults to http/80)
+      - host: wttr.in
+        port: 80
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+      - host: wttr.in
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+      # met.ie — web_fetch fallback (official Irish forecast)
+      - host: www.met.ie
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+      - host: met.ie
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/openclaw }
+      - { path: /usr/local/bin/node }
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/curl }
