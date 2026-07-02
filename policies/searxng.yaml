@@ -1,0 +1,28 @@
+preset:
+  name: searxng
+  description: >-
+    SearXNG host gateway access (web_search backend). allowed_ips permits the
+    resolved private-range address so OpenShell's SSRF guard doesn't block
+    host.openshell.internal before the L7 policy is consulted. Mirrors the
+    searxng_search block install.sh phase_policy_harden writes at first
+    install — reapply after any reinstall/destroy+onboard, which drops it.
+
+network_policies:
+  searxng_search:
+    name: searxng_search
+    endpoints:
+      - host: host.openshell.internal
+        port: 8888
+        protocol: rest
+        enforcement: enforce
+        allowed_ips:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/openclaw }
+      - { path: /usr/local/bin/node }
+      - { path: /usr/bin/node }

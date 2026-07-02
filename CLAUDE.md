@@ -57,6 +57,7 @@ clobbered the sandbox with the wrong model).
 | `README.md` | Quick start + troubleshooting |
 | `policies/news-sources.yaml` | Egress preset: news domains the agent may `web_fetch` (AI News cron + interactive) |
 | `policies/weather-services.yaml` | Egress preset: wttr.in + met.ie for the daily-weather cron |
+| `policies/searxng.yaml` | Egress preset: `host.openshell.internal:8888` (SearXNG) — required for `web_search` to work at all, not just full-article fetch |
 
 Runtime files created during deployment (not in repo):
 - `~/.nemoclaw.env` — credentials (chmod 600; user creates before running install)
@@ -92,15 +93,30 @@ presets here re-open a small, trusted set of hosts to preserve the deny-all post
 |--------|--------------|-------------|
 | `policies/news-sources.yaml` | rte.ie, irishtimes.com, thejournal.ie, bbc.com/.co.uk, techcrunch.com, theregister.com, therundown.ai, tldr.tech, codenewsletter.ai, superhuman.ai (apex + www, GET only) | AI News cron + interactive "latest news" |
 | `policies/weather-services.yaml` | wttr.in (:80 + :443), met.ie / www.met.ie | daily-weather cron |
+| `policies/searxng.yaml` | host.openshell.internal:8888, GET+POST | all `web_search` calls (crons + interactive) |
 
-Apply (idempotent, **hot-reloads** — no sandbox restart needed; survives container
-restart but a full NemoClaw reinstall drops them, so re-apply after reinstall):
+There's also a built-in (non-repo) preset needed for cron jobs specifically: crons run
+inference via a separate `inference_direct` provider hitting `host.openshell.internal:8000`
+directly (not the `managed_inference` / `inference.local` route interactive chat uses), so
+that host:port has its own policy requirement — apply NemoClaw's built-in `local-inference`
+preset (covers :8000, :11434, :11435) rather than writing a custom file for it:
+
+```bash
+nemoclaw the-king policy-add local-inference --yes
+```
+
+Apply the repo presets (idempotent, **hot-reloads** — no sandbox restart needed; survives
+container restart but a full NemoClaw reinstall / `nemoclaw destroy`+`onboard` drops ALL of
+these, including `local-inference` above, so re-apply everything after reinstall):
 
 ```bash
 nemoclaw the-king policy-add --from-file policies/news-sources.yaml --dry-run   # review first
 nemoclaw the-king policy-add --from-file policies/news-sources.yaml --yes
 nemoclaw the-king policy-add --from-file policies/weather-services.yaml --yes
-nemoclaw the-king policy-list                       # confirm both show ● applied
+nemoclaw the-king policy-add --from-file policies/searxng.yaml --yes
+nemoclaw the-king policy-add local-inference --yes
+nemoclaw the-king policy-list                       # confirm presets show ● applied
+nemoclaw the-king status | grep -A2 network_policies  # confirm searxng_search + local_inference hosts present
 ```
 
 Each endpoint uses `protocol: rest` + `enforcement: enforce` with a `GET /**` allow
@@ -176,3 +192,17 @@ docker exec "$CONTAINER" sh -c "cd /sandbox/.openclaw && sha256sum openclaw.json
   policy (e.g. wrong `protocol:`) will crash-loop the container on the next restart
 - vLLM is provisioned by its own external project; if inference fails, check/start
   that project (container `vllm-qwen3.6-35b-a3b-dflash` on :8000) — not this repo
+- The OpenClaw gateway can silently **wedge** (HTTP server on :18789 dead, but the OS
+  process stays alive and keeps long-polling Telegram, so it looks fine from outside)
+  after an inference crash mid-agent-turn. All cron jobs scheduled after the hang are
+  silently skipped — no error is sent anywhere. `nemoclaw the-king recover` and
+  `doctor --fix` do NOT detect this (they check process-alive, not HTTP-alive) and will
+  both report healthy. Diagnose with `tail -f /tmp/openclaw-998/openclaw-$(date
+  +%F).log` inside the sandbox — if it's gone silent, `kill -TERM` the `openclaw` PID
+  (find via `ps aux | grep openclaw` inside the container); the supervisor's built-in
+  respawn loop (`nemoclaw-start`, NemoClaw#2757) relaunches it within seconds and its
+  cron scheduler auto-catches-up any missed jobs. To re-run a specific missed job
+  immediately rather than waiting: `nemoclaw the-king exec -- openclaw cron run <job-id>
+  --wait --wait-timeout 8m` (use `openclaw cron list` for ids; plain `docker exec`
+  instead of `nemoclaw the-king exec` fails with a `GatewayTransportError` — it doesn't
+  carry the right gateway credentials).
